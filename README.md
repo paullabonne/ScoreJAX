@@ -1,11 +1,11 @@
 # ScoreJAX
 
-`JAX` (Bradbury et al. 2018) implementation of the monthly score-driven
-model featuring location, scale and shape common factors from Labonne P.
-(2024). “Asymmetric uncertainty: Nowcasting using skewness in real-time
-data”. *International Journal of Forecasting*
+JAX (Bradbury et al. 2018) implementation of the score-driven model
+featuring location, scale and shape common factors introduced in Labonne
+P. (2024). “Asymmetric uncertainty: Nowcasting using skewness in
+real-time data”. *International Journal of Forecasting*
 
-`JAX` adds automatic differentiation and high-performance numerical
+JAX adds automatic differentiation and high-performance numerical
 computing features to code written in Python.
 
 #### First install all necessary python libraries
@@ -14,7 +14,7 @@ computing features to code written in Python.
 pip install -r requirements.txt
 ```
 
-#### `R` code for building a dataframe from fred-md vintages. The data is saved in the `arrow` `parquet` for easy interoperability with `Python`.
+#### R code for building a dataframe from fred-md vintages. The dataframe is saved in the `arrow` `parquet` format for easy interoperability with Python.
 
 ``` python
 %%bash
@@ -45,8 +45,6 @@ Rscript "R/build_data.R"
 
 ``` python
 import pyarrow.parquet as pq
-import numpy as np
-import pandas as pd
 
 # load the data
 df = pq.read_table("data/df.parquet").to_pandas()
