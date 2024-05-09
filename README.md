@@ -134,7 +134,7 @@ plot = (
     + geom_line(alpha=0.7)
     + labs(title="", x="", y="")
     + theme_minimal()
-    + theme(legend_position="none", figure_size=(4, 4))
+    + theme(legend_position="none", figure_size=(1, 1))
     + scale_x_datetime(date_breaks="10 years")
     + scale_color_manual(values=["tomato", "#00CDCD", "black"])  # Custom colors
     + facet_wrap("~variable", scales="free_y", nrow=3)
