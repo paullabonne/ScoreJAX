@@ -115,7 +115,7 @@ df_plot = df_plot.melt("date", var_name="variable", value_name="value")
 # Plotting
 plot = (
     ggplot(df_plot, aes(x="date", y="value", color="variable"))
-    + geom_line(alpha=0.7, size = 1.1)
+    + geom_line(alpha=0.7, size = 0.9)
     + labs(title="", x="", y="")
     + theme_minimal()
     + theme(figure_size=(7, 4), legend_position="none")
