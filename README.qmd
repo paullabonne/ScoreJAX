@@ -1,0 +1,145 @@
+---
+title: "ScoreJAX"
+format: markdown_github
+engine: jupyter
+bibliography: bibliography.bib
+---
+
+#### `JAX` [@jax2018github] implementation of the monthly score-driven model featuring location, scale and shape common factors from Labonne P. (2024). "Asymmetric uncertainty: Nowcasting using skewness in real-time data". *International Journal of Forecasting*
+
+`JAX` adds automatic differentiation and high-performance numerical computing features to code written in Python.
+
+```{python}
+import sys
+sys.path.append('src')
+```
+
+#### First install all necessary python libraries
+```{python}
+#| output: false
+
+pip install -r requirements.txt
+```
+
+#### `R` code for building a dataframe from fred-md vintages. The data is saved in the `arrow` `parquet` for easy interoperability with `Python`.
+```{python}
+#| message: false
+#| warning: false
+%%bash
+
+# first install all necessary packages
+Rscript "R/install.R"
+
+# build the dataframe
+Rscript "R/build_data.R"
+```
+
+#### Load the dataframe in `Python`
+```{python}
+import pyarrow.parquet as pq
+import numpy as np
+import pandas as pd
+
+# load the data
+df = pq.read_table("data/df.parquet").to_pandas()
+
+df['date'] = pd.to_numeric(df['date'])
+```
+
+#### Estimation with maximum likelihood
+```{python}
+import jax
+import jax.numpy as jnp
+from jax import random
+from sdfm import build_model
+from sdfm import mle
+
+# convert the data to a JAX type
+df_np = df.to_numpy()
+y = jnp.array(df_np[:, 1:])
+
+# build the model
+slack_model = build_model(y)
+
+# estimation with maximum likelihood
+key = jax.random.PRNGKey(123)
+mle_result = mle(model=slack_model, iter=50, pertu=0.25, key=key)
+
+print("ML at", -mle_result.fun)
+```
+
+#### Plot of the estimated common factors
+```{python}
+#| echo: false
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from sdfm import sd_filter
+
+# deal with the date
+# Function to convert yearmon from numeric format
+def convert_yearmon(yearmon):
+    year = int(yearmon)
+    month = int((yearmon - year) * 12 + 1)  # Adjusting for base-1 index
+    return pd.Timestamp(year=year, month=month, day=1)
+
+# Apply the conversion function
+df['date'] = df['date'].apply(convert_yearmon)
+
+# plot
+estimated_filter = sd_filter(mle_result.x, slack_model)
+a_loc = estimated_filter[2]
+a_scale = estimated_filter[2]
+a_shape = estimated_filter[2]
+
+factor_loc = estimated_filter[0][:, y.shape[1]]
+factor_scale = estimated_filter[1][:, y.shape[1]]
+factor_shape = estimated_filter[2][:, y.shape[1]]
+
+# Create a figure with subplots
+fig = make_subplots(rows=3, cols=1)
+
+# Adding each array to the plot
+fig.add_trace(
+    go.Scatter(
+        x = df['date'],
+        y=factor_loc,
+        mode="lines",
+        name="Location common factor",
+        line=dict(color="tomato"),
+    ),
+    row=1,
+    col=1,
+)
+fig.add_trace(
+    go.Scatter(
+        x = df['date'],
+        y=factor_scale,
+        mode="lines",
+        name="Scale common factor",
+        line=dict(color="#00CDCD"),
+    ),
+    row=2,
+    col=1,
+)
+fig.add_trace(
+    go.Scatter(
+        x = df['date'],
+        y=factor_shape,
+        mode="lines",
+        name="Shape common factor",
+        line=dict(color="black"),
+    ),
+    row=3,
+    col=1,
+)
+
+fig.update_traces(opacity=0.8)
+
+# Update layout
+fig.update_layout(
+    title="Estimated common factors", yaxis_title="", xaxis_title="", showlegend=True
+)
+
+# Show the plot
+fig.show()
+```

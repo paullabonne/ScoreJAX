@@ -1,0 +1,6 @@
+jax
+numpy
+pandas
+scipy
+pyarrow
+plotly
