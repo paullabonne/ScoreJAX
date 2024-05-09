@@ -5,14 +5,9 @@ engine: jupyter
 bibliography: bibliography.bib
 ---
 
-#### `JAX` [@jax2018github] implementation of the monthly score-driven model featuring location, scale and shape common factors from Labonne P. (2024). "Asymmetric uncertainty: Nowcasting using skewness in real-time data". *International Journal of Forecasting*
+`JAX` [@jax2018github] implementation of the monthly score-driven model featuring location, scale and shape common factors from Labonne P. (2024). "Asymmetric uncertainty: Nowcasting using skewness in real-time data". *International Journal of Forecasting*
 
 `JAX` adds automatic differentiation and high-performance numerical computing features to code written in Python.
-
-```{python}
-import sys
-sys.path.append('src')
-```
 
 #### First install all necessary python libraries
 ```{python}
@@ -42,17 +37,17 @@ import pandas as pd
 
 # load the data
 df = pq.read_table("data/df.parquet").to_pandas()
-
-df['date'] = pd.to_numeric(df['date'])
 ```
 
 #### Estimation with maximum likelihood
 ```{python}
+import sys
+sys.path.append('src') # to fing sdfm
+from sdfm import build_model
+from sdfm import mle
 import jax
 import jax.numpy as jnp
 from jax import random
-from sdfm import build_model
-from sdfm import mle
 
 # convert the data to a JAX type
 df_np = df.to_numpy()
@@ -83,6 +78,7 @@ def convert_yearmon(yearmon):
     return pd.Timestamp(year=year, month=month, day=1)
 
 # Apply the conversion function
+df['date'] = pd.to_numeric(df['date'])
 df['date'] = df['date'].apply(convert_yearmon)
 
 # plot
@@ -141,5 +137,6 @@ fig.update_layout(
 )
 
 # Show the plot
-fig.show()
+fig.write_image("plots/factors.pdf")
+![](plots/example_plot.pdf)
 ```
