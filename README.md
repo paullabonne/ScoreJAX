@@ -73,12 +73,12 @@ slack_model = build_model(y)
 
 # estimation with maximum likelihood
 key = jax.random.PRNGKey(123)
-mle_result = mle(model=slack_model, iter=50, pertu=0.25, key=key)
+mle_result = mle(model=slack_model, iter=0, pertu=0.25, key=key)
 
 print("ML at", -mle_result.fun)
 ```
 
-    ML at -5098.0634765625
+    ML at -5926.685546875
 
 #### Run the filter with the estimated parameters
 
@@ -91,7 +91,18 @@ estimated_filter = sd_filter(mle_result.x, slack_model)
 #### Plot the estimated common factors
 
 ``` python
-from plotnine import ggplot, aes, geom_line, labs, theme_minimal, facet_wrap, theme, scale_x_datetime, scale_color_manual
+from plotnine import (
+    ggplot,
+    aes,
+    geom_line,
+    labs,
+    theme_minimal,
+    facet_wrap,
+    theme,
+    scale_x_datetime,
+    scale_color_manual,
+)
+
 
 # first deal with the dates
 # Function to convert yearmon from numeric format
@@ -99,6 +110,7 @@ def convert_yearmon(yearmon):
     year = int(yearmon)
     month = int((yearmon - year) * 12 + 1)  # Adjusting for base-1 index
     return pd.Timestamp(year=year, month=month, day=1)
+
 
 # Apply the conversion function
 dates = pd.to_numeric(df["date"])
@@ -120,21 +132,19 @@ df_plot = df_plot.melt("date", var_name="variable", value_name="value")
 plot = (
     ggplot(df_plot, aes(x="date", y="value", color="variable"))
     + geom_line(alpha=0.7)
-    + labs(title='', x='', y='')
+    + labs(title="", x="", y="")
     + theme_minimal()
-    + theme(legend_position='none')
-    + scale_x_datetime(date_breaks='10 years')
-    + scale_color_manual(values=['tomato', '#00CDCD', 'black'])  # Custom colors
-    + facet_wrap("~variable", scales="free_y", nrow = 3)
+    + theme(legend_position="none", figure_size=(6, 6))
+    + scale_x_datetime(date_breaks="10 years")
+    + scale_color_manual(values=["tomato", "#00CDCD", "black"])  # Custom colors
+    + facet_wrap("~variable", scales="free_y", nrow=3)
 )
 
 # Display the plot
-print(plot)
+plot.show()
 ```
 
-    /var/folders/w6/t735ls3d5kq8w0q732jmc_zw0000gn/T/ipykernel_30886/2095287704.py:39: FutureWarning: Using print(plot) to draw and show the plot figure is deprecated and will be removed in a future version. Use plot.show().
-
-![](README_files/figure-markdown_github/cell-7-output-2.png)
+![](README_files/figure-markdown_github/cell-7-output-1.png)
 
 Bradbury, James, Roy Frostig, Peter Hawkins, Matthew James Johnson,
 Chris Leary, Dougal Maclaurin, George Necula, et al. 2018. “JAX:
