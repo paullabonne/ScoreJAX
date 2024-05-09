@@ -50,21 +50,33 @@ import pandas as pd
 
 # load the data
 df = pq.read_table("data/df.parquet").to_pandas()
+df_np = df.to_numpy() # for easy use with JAX
+
+# deal with the date for plotting later
+# Function to convert yearmon from numeric format
+def convert_yearmon(yearmon):
+    year = int(yearmon)
+    month = int((yearmon - year) * 12 + 1)  # Adjusting for base-1 index
+    return pd.Timestamp(year=year, month=month, day=1)
+
+# Apply the conversion function
+df['date'] = pd.to_numeric(df['date'])
+df['date'] = df['date'].apply(convert_yearmon)
 ```
 
 #### Estimation with maximum likelihood
 
 ``` python
 import sys
-sys.path.append('src') # to fing sdfm
+sys.path.append('src') # to find sdfm
 from sdfm import build_model
 from sdfm import mle
+
 import jax
 import jax.numpy as jnp
 from jax import random
 
 # convert the data to a JAX type
-df_np = df.to_numpy()
 y = jnp.array(df_np[:, 1:])
 
 # build the model
@@ -81,11 +93,73 @@ print("ML at", -mle_result.fun)
 
 #### Plot of the estimated common factors
 
-    zsh:1: number expected
+``` python
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.io as pio
 
-    /Users/paullabonne/.pyenv/versions/3.12.2/lib/python3.12/pty.py:95: RuntimeWarning:
+from sdfm import sd_filter
 
-    os.fork() was called. os.fork() is incompatible with multithreaded code, and JAX is multithreaded, so this will likely lead to a deadlock.
+# plot
+estimated_filter = sd_filter(mle_result.x, slack_model)
+a_loc = estimated_filter[2]
+a_scale = estimated_filter[2]
+a_shape = estimated_filter[2]
+
+factor_loc = estimated_filter[0][:, y.shape[1]]
+factor_scale = estimated_filter[1][:, y.shape[1]]
+factor_shape = estimated_filter[2][:, y.shape[1]]
+
+# Create a figure with subplots
+fig = make_subplots(rows=3, cols=1)
+
+# Adding each array to the plot
+fig.add_trace(
+    go.Scatter(
+        x = df['date'],
+        y=factor_loc,
+        mode="lines",
+        name="Location common factor",
+        line=dict(color="tomato"),
+    ),
+    row=1,
+    col=1,
+)
+fig.add_trace(
+    go.Scatter(
+        x = df['date'],
+        y=factor_scale,
+        mode="lines",
+        name="Scale common factor",
+        line=dict(color="#00CDCD"),
+    ),
+    row=2,
+    col=1,
+)
+fig.add_trace(
+    go.Scatter(
+        x = df['date'],
+        y=factor_shape,
+        mode="lines",
+        name="Shape common factor",
+        line=dict(color="black"),
+    ),
+    row=3,
+    col=1,
+)
+
+fig.update_traces(opacity=0.8)
+
+# Update layout
+fig.update_layout(
+    title="Estimated common factors", yaxis_title="", xaxis_title="", showlegend=True
+)
+
+# Show the plot
+pio.write_image(fig, "plots/factors.png")
+```
+
+![plot](plots/factors.png)
 
 Bradbury, James, Roy Frostig, Peter Hawkins, Matthew James Johnson,
 Chris Leary, Dougal Maclaurin, George Necula, et al. 2018. “JAX:

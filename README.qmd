@@ -37,20 +37,32 @@ import pandas as pd
 
 # load the data
 df = pq.read_table("data/df.parquet").to_pandas()
+df_np = df.to_numpy() # for easy use with JAX
+
+# deal with the date for plotting later
+# Function to convert yearmon from numeric format
+def convert_yearmon(yearmon):
+    year = int(yearmon)
+    month = int((yearmon - year) * 12 + 1)  # Adjusting for base-1 index
+    return pd.Timestamp(year=year, month=month, day=1)
+
+# Apply the conversion function
+df['date'] = pd.to_numeric(df['date'])
+df['date'] = df['date'].apply(convert_yearmon)
 ```
 
 #### Estimation with maximum likelihood
 ```{python}
 import sys
-sys.path.append('src') # to fing sdfm
+sys.path.append('src') # to find sdfm
 from sdfm import build_model
 from sdfm import mle
+
 import jax
 import jax.numpy as jnp
 from jax import random
 
 # convert the data to a JAX type
-df_np = df.to_numpy()
 y = jnp.array(df_np[:, 1:])
 
 # build the model
@@ -65,21 +77,11 @@ print("ML at", -mle_result.fun)
 
 #### Plot of the estimated common factors
 ```{python}
-#| echo: false
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import plotly.io as pio
+
 from sdfm import sd_filter
-
-# deal with the date
-# Function to convert yearmon from numeric format
-def convert_yearmon(yearmon):
-    year = int(yearmon)
-    month = int((yearmon - year) * 12 + 1)  # Adjusting for base-1 index
-    return pd.Timestamp(year=year, month=month, day=1)
-
-# Apply the conversion function
-df['date'] = pd.to_numeric(df['date'])
-df['date'] = df['date'].apply(convert_yearmon)
 
 # plot
 estimated_filter = sd_filter(mle_result.x, slack_model)
@@ -137,6 +139,7 @@ fig.update_layout(
 )
 
 # Show the plot
-fig.write_image("plots/factors.pdf")
-![](plots/example_plot.pdf)
+pio.write_image(fig, "plots/factors.pdf")
 ```
+
+![plot](plots/factors.pdf)
