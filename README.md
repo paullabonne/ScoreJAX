@@ -73,12 +73,12 @@ slack_model = build_model(y)
 
 # estimation with maximum likelihood
 key = jax.random.PRNGKey(123)
-mle_result = mle(model=slack_model, iter=0, pertu=0.25, key=key)
+mle_result = mle(model=slack_model, iter=50, pertu=0.25, key=key)
 
 print("ML at", -mle_result.fun)
 ```
 
-    ML at -5926.685546875
+    ML at -5098.0634765625
 
 #### Run the filter with the estimated parameters
 
@@ -134,7 +134,7 @@ plot = (
     + geom_line(alpha=0.7)
     + labs(title="", x="", y="")
     + theme_minimal()
-    + theme(figure_size=(1, 6), legend_position="none")
+    + theme(figure_size=(3, 4), legend_position="none")
     + scale_x_datetime(date_breaks="10 years")
     + scale_color_manual(values=["tomato", "#00CDCD", "black"])  # Custom colors
     + facet_wrap("~variable", scales="free_y", nrow=3)
