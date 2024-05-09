@@ -1,6 +1,6 @@
 ---
 title: "ScoreJAX"
-format: markdown_github
+format: gfm
 engine: jupyter
 bibliography: bibliography.bib
 ---
@@ -71,8 +71,10 @@ from sdfm import sd_filter
 estimated_filter = sd_filter(mle_result.x, slack_model)
 ```
 
-#### Plot the estimated common factors
+#### Plot of the estimated common factors
 ```{python}
+#| echo: false
+
 from plotnine import (
     ggplot,
     aes,
@@ -113,10 +115,10 @@ df_plot = df_plot.melt("date", var_name="variable", value_name="value")
 # Plotting
 plot = (
     ggplot(df_plot, aes(x="date", y="value", color="variable"))
-    + geom_line(alpha=0.7)
+    + geom_line(alpha=0.7, size = 1.3)
     + labs(title="", x="", y="")
     + theme_minimal()
-    + theme(figure_size=(4, 4), legend_position="none")
+    + theme(figure_size=(7, 4), legend_position="none")
     + scale_x_datetime(date_breaks="10 years")
     + scale_color_manual(values=["tomato", "#00CDCD", "black"])  # Custom colors
     + facet_wrap("~variable", scales="free_y", nrow=3)

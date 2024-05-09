@@ -88,65 +88,19 @@ from sdfm import sd_filter
 estimated_filter = sd_filter(mle_result.x, slack_model)
 ```
 
-#### Plot the estimated common factors
+#### Plot of the estimated common factors
 
-``` python
-from plotnine import (
-    ggplot,
-    aes,
-    geom_line,
-    labs,
-    theme_minimal,
-    facet_wrap,
-    theme,
-    scale_x_datetime,
-    scale_color_manual,
-)
+![](README_files/figure-commonmark/cell-7-output-1.png)
 
+<div id="refs" class="references csl-bib-body hanging-indent">
 
-# first deal with the dates
-# Function to convert yearmon from numeric format
-def convert_yearmon(yearmon):
-    year = int(yearmon)
-    month = int((yearmon - year) * 12 + 1)  # Adjusting for base-1 index
-    return pd.Timestamp(year=year, month=month, day=1)
-
-
-# Apply the conversion function
-dates = pd.to_numeric(df["date"])
-dates = dates.apply(convert_yearmon)
-
-# create dataframe for plotting
-df_plot = pd.DataFrame(
-    {
-        "date": dates,
-        "Location Common Factor": estimated_filter[0][:, y.shape[1]],
-        "Scale Common Factor": estimated_filter[1][:, y.shape[1]],
-        "Shape Common Factor": estimated_filter[2][:, y.shape[1]],
-    }
-)
-
-df_plot = df_plot.melt("date", var_name="variable", value_name="value")
-
-# Plotting
-plot = (
-    ggplot(df_plot, aes(x="date", y="value", color="variable"))
-    + geom_line(alpha=0.7)
-    + labs(title="", x="", y="")
-    + theme_minimal()
-    + theme(figure_size=(4, 4), legend_position="none")
-    + scale_x_datetime(date_breaks="10 years")
-    + scale_color_manual(values=["tomato", "#00CDCD", "black"])  # Custom colors
-    + facet_wrap("~variable", scales="free_y", nrow=3)
-)
-
-# Display the plot
-plot.show()
-```
-
-![](README_files/figure-markdown_github/cell-7-output-1.png)
+<div id="ref-jax2018github" class="csl-entry">
 
 Bradbury, James, Roy Frostig, Peter Hawkins, Matthew James Johnson,
 Chris Leary, Dougal Maclaurin, George Necula, et al. 2018. “JAX:
 Composable Transformations of Python+NumPy Programs.”
 <http://github.com/google/jax>.
+
+</div>
+
+</div>
