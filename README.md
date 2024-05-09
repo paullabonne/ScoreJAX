@@ -156,10 +156,10 @@ fig.update_layout(
 )
 
 # Show the plot
-pio.write_image(fig, "plots/factors.png")
+pio.write_image(fig, "plots/factors.pdf")
 ```
 
-![plot](plots/factors.png)
+![plot](plots/factors.pdf)
 
 Bradbury, James, Roy Frostig, Peter Hawkins, Matthew James Johnson,
 Chris Leary, Dougal Maclaurin, George Necula, et al. 2018. “JAX:
