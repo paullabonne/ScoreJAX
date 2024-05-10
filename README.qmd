@@ -27,7 +27,7 @@ pip install -r requirements.txt
 Rscript "R/install.R"
 
 # build the dataframe
-Rscript "R/build_data.R"
+Rscript "R/fredmd.R"
 ```
 
 #### Load the dataframe in `Python`

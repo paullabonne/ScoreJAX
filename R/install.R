@@ -1,7 +1,4 @@
-packages <- c(
-    "dplyr", "tidyr", "zoo",
-    "magrittr", "arrow", "knitr"
-)
+packages <- c("dplyr", "tidyr", "magrittr", "zoo", "arrow", "knitr")
 
 install.packages(setdiff(
     packages,
