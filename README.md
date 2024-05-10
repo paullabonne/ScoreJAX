@@ -47,7 +47,7 @@ Rscript "R/fredmd.R"
 import pyarrow.parquet as pq
 
 # load the data
-df = pq.read_table("data/df.parquet").to_pandas()
+df = pq.read_table("data/df_fredmd.parquet").to_pandas()
 ```
 
 #### Estimation with maximum likelihood
@@ -76,7 +76,7 @@ mle_result = mle(model=slack_model, iter=50, pertu=0.25, key=key)
 print("ML at", -mle_result.fun)
 ```
 
-    ML at -5098.0634765625
+    ML at -4192.26953125
 
 #### Run the filter with the estimated parameters
 

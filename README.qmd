@@ -35,7 +35,7 @@ Rscript "R/fredmd.R"
 import pyarrow.parquet as pq
 
 # load the data
-df = pq.read_table("data/df.parquet").to_pandas()
+df = pq.read_table("data/df_fredmd.parquet").to_pandas()
 ```
 
 #### Estimation with maximum likelihood
