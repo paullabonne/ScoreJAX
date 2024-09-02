@@ -3,7 +3,7 @@
 JAX (Bradbury et al. 2018) implementation of the score-driven model
 featuring location, scale and shape common factors introduced in Labonne
 P. (2024). “Asymmetric uncertainty: Nowcasting using skewness in
-real-time data”. *International Journal of Forecasting*
+real-time data”. *International Journal of Forecasting* https://doi.org/10.1016/j.ijforecast.2024.05.003
 
 JAX adds automatic differentiation and high-performance numerical
 computing features to code written in Python.
