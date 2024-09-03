@@ -86,7 +86,7 @@ def build_model(y):
     """ Build the matrices used in the score driven recursion.
 
     Args:
-        y: Vector of observations.
+        y: Matrix of observations.
 
     Returns:
         Tupple of model components.
