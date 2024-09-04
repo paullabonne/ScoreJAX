@@ -252,7 +252,7 @@ def recursion(y, fin, a_init, Z, T, K, nu):
 
 @partial(jit, static_argnums=(1, 2))
 def filter(pars, model, mle):
-    """ Initialise and run a Kalman filter model.
+    """ Initialise and run the score driven model.
 
     Args:
         pars: Parameters used for initialisation / parametrisation.
