@@ -74,7 +74,7 @@ def score(v, params):
 
     score = jnp.array([score_loc, score_scale, score_shape])
     score = jnp.nan_to_num(score, nan=0.0, posinf=0.0, neginf=0.0)
-    score = score[:,:,None]
+    score = score[:, :, None]
     return score
 
 
@@ -232,14 +232,12 @@ def recursion(y, fin, a_init, Z, T, K, nu):
     inputs = y, fin
 
     # Execute scan
-    (_, _, _, _, _, _), (loglik, a) = lax.scan(
-        step_wrapper, initial_carry, inputs
-    )
-    
+    (_, _, _, _, _, _), (loglik, a) = lax.scan(step_wrapper, initial_carry, inputs)
+
     return (loglik, jnp.transpose(a, (1, 0, 2)))
 
 
-@partial(jit, static_argnums=(1, 2))
+@partial(jit, static_argnums=(2,))
 def filter(pars, model, mle):
     """Initialise and run the score driven model.
 
@@ -282,8 +280,6 @@ def log_likelihood(pars, model):
     loglik = filter(pars, model, mle=True)
     return loglik
 
-
-@jit
 def sd_filter(pars, model):
     """Helper, returns the model after intialisation and recursion"""
 
