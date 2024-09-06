@@ -11,23 +11,20 @@ JAX adds automatic differentiation and high-performance numerical computing feat
 
 #### First install all necessary python libraries
 ```{python}
-#| output: false
+%%capture
 
-pip install -r requirements.txt
+! pip install -r requirements.txt
 ```
 
 #### R code for building a dataframe from fred-md vintages. The dataframe is saved in the `arrow` `parquet` format for easy interoperability with Python.
 ```{python}
-#| message: false
-#| warning: false
-#| 
-%%bash
+%%capture
 
 # first install all necessary packages
-Rscript "R/install.R"
+! Rscript "R/install.R"
 
 # build the dataframe
-Rscript "R/fredmd.R"
+! Rscript "R/fredmd.R"
 ```
 
 #### Load the dataframe in `Python`
@@ -36,6 +33,8 @@ import pyarrow.parquet as pq
 
 # load the data
 df = pq.read_table("data/df_fredmd.parquet").to_pandas()
+
+df
 ```
 
 #### Estimation with maximum likelihood
@@ -58,14 +57,11 @@ slack_model = build_model(y)
 
 # estimation with maximum likelihood
 key = jax.random.PRNGKey(123)
-%time mle_result = mle(model=slack_model, iter=50, pertu=0.25, key=key)
+mle_result = mle(model=slack_model, iter=50, pertu=0.25, key=key)
 
 print("ML at", -mle_result.fun)
 ```
 
-```{python}
-y.shape[1]
-```
 #### Run the filter with the estimated parameters
 ```{python}
 from sdfm import sd_filter

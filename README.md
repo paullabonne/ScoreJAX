@@ -3,7 +3,7 @@
 JAX (Bradbury et al. 2018) implementation of the score-driven model
 featuring location, scale and shape common factors introduced in Labonne
 P. (2024). “Asymmetric uncertainty: Nowcasting using skewness in
-real-time data”. *International Journal of Forecasting* https://doi.org/10.1016/j.ijforecast.2024.05.003
+real-time data”. *International Journal of Forecasting*
 
 JAX adds automatic differentiation and high-performance numerical
 computing features to code written in Python.
@@ -11,35 +11,22 @@ computing features to code written in Python.
 #### First install all necessary python libraries
 
 ``` python
-pip install -r requirements.txt
+%%capture
+
+! pip install -r requirements.txt
 ```
 
 #### R code for building a dataframe from fred-md vintages. The dataframe is saved in the `arrow` `parquet` format for easy interoperability with Python.
 
 ``` python
-%%bash
+%%capture
 
 # first install all necessary packages
-Rscript "R/install.R"
+! Rscript "R/install.R"
 
 # build the dataframe
-Rscript "R/fredmd.R"
+! Rscript "R/fredmd.R"
 ```
-
-    First and last 5 rows of the dataframe:
-
-    |date     |     INDPRO|     CE16OV|     CUMFNS| DPCERA3M086SBEA|     PAYEMS|    RETAILx|        RPI|     UNRATE|
-    |:--------|----------:|----------:|----------:|---------------:|----------:|----------:|----------:|----------:|
-    |Feb 1959 |  1.7382786| -0.6128983|  1.4815090|       0.9669602|  0.4387042|  0.1691631|  0.1101987| -0.2245379|
-    |Mar 1959 |  1.2308349|  1.1933739|  1.2307785|       0.8486294|  0.8080251|  0.2341810|  0.3291290| -0.6866133|
-    |Apr 1959 |  1.9064116|  0.9905033|  1.8015046|      -0.7826956|  0.7410967| -0.2611915|  0.3336894| -0.9176510|
-    |May 1959 |  1.2955892| -0.3390238|  1.0998389|       1.1790249|  0.4882709|  0.2008923|  0.2730984| -0.2245379|
-    |Jun 1959 | -0.0828532|  0.1700756| -0.1704180|       0.1269771|  0.1754008|  0.2819564|  0.0415569| -0.2245379|
-    |Nov 2023 |  0.1624801|  0.3674587|  0.3635406|       0.1899331| -0.0425832| -0.2337638|  0.1138308| -0.2245379|
-    |Dec 2023 | -0.5106774| -0.8151388| -0.0860901|       0.2441512|  0.0738307| -0.0673339| -0.0443199|  0.0064998|
-    |Jan 2024 | -0.9816326| -0.2075112| -1.1741701|      -0.7242012|  0.0366090| -1.0016218|  0.2957077|  0.0064998|
-    |Feb 2024 |  0.2422712| -0.3505441|  0.9614271|       0.2730607|  0.0512261|  0.3503235| -0.2717004|  0.4685752|
-    |Mar 2024 |  0.1906866|  0.2864882|  0.3234521|       0.3124255|  0.0861743|  0.1523103| -0.0566724| -0.2245379|
 
 #### Load the dataframe in `Python`
 
@@ -48,7 +35,39 @@ import pyarrow.parquet as pq
 
 # load the data
 df = pq.read_table("data/df_fredmd.parquet").to_pandas()
+
+df
 ```
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+&#10;    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+&#10;    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+|     | date        | INDPRO    | CE16OV    | CUMFNS    | DPCERA3M086SBEA | PAYEMS    | RETAILx   | RPI       | UNRATE    |
+|-----|-------------|-----------|-----------|-----------|-----------------|-----------|-----------|-----------|-----------|
+| 0   | 1959.083333 | 1.738279  | -0.612898 | 1.481509  | 0.966960        | 0.438704  | 0.169163  | 0.110199  | -0.224538 |
+| 1   | 1959.166667 | 1.230835  | 1.193374  | 1.230779  | 0.848629        | 0.808025  | 0.234181  | 0.329129  | -0.686613 |
+| 2   | 1959.250000 | 1.906412  | 0.990503  | 1.801505  | -0.782696       | 0.741097  | -0.261192 | 0.333689  | -0.917651 |
+| 3   | 1959.333333 | 1.295589  | -0.339024 | 1.099839  | 1.179025        | 0.488271  | 0.200892  | 0.273098  | -0.224538 |
+| 4   | 1959.416667 | -0.082853 | 0.170076  | -0.170418 | 0.126977        | 0.175401  | 0.281956  | 0.041557  | -0.224538 |
+| ... | ...         | ...       | ...       | ...       | ...             | ...       | ...       | ...       | ...       |
+| 777 | 2023.833333 | 0.162480  | 0.367459  | 0.363541  | 0.189933        | -0.042583 | -0.233764 | 0.113831  | -0.224538 |
+| 778 | 2023.916667 | -0.510677 | -0.815139 | -0.086090 | 0.244151        | 0.073831  | -0.067334 | -0.044320 | 0.006500  |
+| 779 | 2024.000000 | -0.981633 | -0.207511 | -1.174170 | -0.724201       | 0.036609  | -1.001622 | 0.295708  | 0.006500  |
+| 780 | 2024.083333 | 0.242271  | -0.350544 | 0.961427  | 0.273061        | 0.051226  | 0.350324  | -0.271700 | 0.468575  |
+| 781 | 2024.166667 | 0.190687  | 0.286488  | 0.323452  | 0.312425        | 0.086174  | 0.152310  | -0.056672 | -0.224538 |
+
+<p>782 rows × 9 columns</p>
+</div>
 
 #### Estimation with maximum likelihood
 
@@ -76,13 +95,12 @@ mle_result = mle(model=slack_model, iter=50, pertu=0.25, key=key)
 print("ML at", -mle_result.fun)
 ```
 
-    ML at -4192.26953125
+    ML at -4198.79052734375
 
 #### Run the filter with the estimated parameters
 
 ``` python
 from sdfm import sd_filter
-
 estimated_filter = sd_filter(mle_result.x, slack_model)
 ```
 
