@@ -50,14 +50,12 @@ def log_f(v, params):
     return log_f
 
 
-@partial(jit, static_argnums=(2,))
-def score(v, params, partial):
+def score(v, params):
     """Score function of the skew t likelihood.
 
     Args:
         v: Vector of prediction errors.
         params: Matrix of parameters.
-        partial: String indicating the parameter with which to differentiate.
 
     Returns:
         Vector of scores.
@@ -70,20 +68,18 @@ def score(v, params, partial):
     zeta = v / scale
     w = (1 + eta) / ((1 - sign(v) * shape) ** 2 + eta * zeta**2)
 
-    if partial == "loc":
-        score = 1 / scale * w * zeta
-    elif partial == "scale":
-        score = 1 / (2 * scale**2) * (w * zeta**2 - 1)
-    elif partial == "shape":
-        score = -sign(v) / (1 - sign(v) * shape) * w * zeta**2
+    score_loc = 1 / scale * w * zeta
+    score_scale = 1 / (2 * scale**2) * (w * zeta**2 - 1)
+    score_shape = -sign(v) / (1 - sign(v) * shape) * w * zeta**2
 
+    score = jnp.array([score_loc, score_scale, score_shape])
     score = jnp.nan_to_num(score, nan=0.0, posinf=0.0, neginf=0.0)
-
+    score = score[:,:,None]
     return score
 
 
 def build_model(y):
-    """ Build the matrices used in the score driven recursion.
+    """Build the matrices used in the score driven recursion.
 
     Args:
         y: Matrix of observations.
@@ -91,28 +87,28 @@ def build_model(y):
     Returns:
         Tupple of model components.
     """
-    
+
     N, m = y.shape
     p = m + 1
 
-    identity_block = jnp.repeat(jnp.eye(m)[:, :, None], 3, axis=2)
+    identity_block = jnp.repeat(jnp.eye(m)[None, :, :], 3, axis=0)
 
     # array of observation/link matrices
-    Z = jnp.zeros((m, p, 3))
-    Z = Z.at[:, 0:m, :].set(identity_block)
+    Z = jnp.zeros((3, m, p))
+    Z = Z.at[:, :, 0:m].set(identity_block)
 
     # array of transition matrices
-    T = jnp.zeros((p, p, 3))
-    T = T.at[0:m, 0:m, :].set(identity_block)
+    T = jnp.zeros((3, p, p))
+    T = T.at[:, 0:m, 0:m].set(identity_block)
 
     # array of gains
-    K = jnp.zeros((p, p, 3))
-    K = K.at[0:m, 0:m, :].set(identity_block)
+    K = jnp.zeros((3, p, p))
+    K = K.at[:, 0:m, 0:m].set(identity_block)
 
     # array of states
-    a = jnp.zeros((p, N + 1, 3))
-    
-    # Where observations are missing 
+    a = jnp.zeros((3, p, N + 1))
+
+    # Where observations are missing
     fin = jnp.isfinite(y).astype(jnp.float32)
 
     model = (y, fin, a, Z, T, K)
@@ -121,42 +117,42 @@ def build_model(y):
 
 
 def initialise(pars, model):
-    """ Initialise the model using a set of parameters.
+    """Initialise the model using a set of parameters.
 
     Args:
         pars: Vector of parameters to use of initialisation.
         model: Tupple of model components.
-        
+
     Returns:
         List of initialised components.
     """
-    
+
     _, _, _, Z, T, K = model
 
-    m, p, _ = Z.shape
+    _, m, p = Z.shape
 
     n_pars = 0
 
-    a_init = jnp.zeros((p, 3))
+    a_init = jnp.zeros((3, p, 1))
 
     for i in range(3):
         # initial state
-        a_init = a_init.at[0:m, i].set(pars[n_pars : n_pars + m] / 1e1)
+        a_init = a_init.at[i, 0:m, 0].set(pars[n_pars : n_pars + m] / 1e1)
         n_pars += m
 
         # observation matrices
-        Z = Z.at[0, m, i].set(1.0)  # factor is one for the first series
-        Z = Z.at[1:, m, i].set(pars[n_pars : (n_pars + m - 1)])
+        Z = Z.at[i, 0, m].set(1.0)  # factor is one for the first series
+        Z = Z.at[i, 1:, m].set(pars[n_pars : (n_pars + m - 1)])
         n_pars += m - 1
 
         # gain matrix
-        K = K.at[0 : m + 1, 0 : m + 1, i].set(
+        K = K.at[i, 0 : m + 1, 0 : m + 1].set(
             jnp.diag(jnp.exp(pars[n_pars : n_pars + m + 1]) / 1e2)
         )
         n_pars += m + 1
 
         # transition matrix
-        T = T.at[m, m, i].set(jnp.tanh(pars[n_pars]) * 0.95)
+        T = T.at[i, m, m].set(jnp.tanh(pars[n_pars]) * 0.95)
         n_pars += 1
 
     # nu (tail parameter)
@@ -167,102 +163,95 @@ def initialise(pars, model):
 
 
 def filter_step(model_t):
-    """ Score driven recursion from t and t+1
+    """Score driven recursion from t and t+1
 
     Args:
         model_t: Tupple of model components at t.
-        
+
     Returns:
         List of model components at t+1.
     """
-    
-    y_t, fin_t, a_loc_t, a_scale_t, a_shape_t, Z, T, K, nu = model_t
+
+    y_t, fin_t, a_t, Z, T, K, nu = model_t
 
     m = y_t.shape[0]
 
+    # get signal at t
+    signal_t = jnp.squeeze(jnp.matmul(Z, a_t))
+
+    # update distribution parameters
     params = jnp.zeros((m, 3))
-    params = params.at[:, 0].set(jnp.exp(Z[:, :, 1] @ a_scale_t))
-    params = params.at[:, 1].set(jnp.tanh(Z[:, :, 2] @ a_shape_t))
+    params = params.at[:, 0].set(jnp.exp(signal_t[1, :]))
+    params = params.at[:, 1].set(jnp.tanh(signal_t[2, :]))
     params = params.at[:, 2].set(nu)
 
     # prediction error
-    v = y_t - Z[:, :, 0] @ a_loc_t
+    v = y_t - signal_t[0, :]
     v_no_nan = jnp.nan_to_num(v, nan=0)
 
     # computing the scaled score
-    score_loc = score(v_no_nan, params, "loc")
-    score_scale = score(v_no_nan, params, "scale")
-    score_shape = score(v_no_nan, params, "shape")
+    scores = score(v_no_nan, params)
 
     # filtering step
-    a_loc_tt = a_loc_t + K[:, :, 0] @ Z[:, :, 0].T @ score_loc
-    a_scale_tt = a_scale_t + K[:, :, 1] @ Z[:, :, 1].T @ score_scale
-    a_shape_tt = a_shape_t + K[:, :, 2] @ Z[:, :, 2].T @ score_shape
+    a_tt = a_t + K @ jnp.transpose(Z, (0, 2, 1)) @ scores
 
     # prediction step
-    a_loc_t1 = T[:, :, 0] @ a_loc_tt
-    a_scale_t1 = T[:, :, 1] @ a_scale_tt
-    a_shape_t1 = T[:, :, 2] @ a_shape_tt
+    a_t1 = T @ a_tt
 
     # compute loglik
     ll_t = log_f(v, params) * fin_t
 
-    return a_loc_t1, a_scale_t1, a_shape_t1, ll_t
+    return a_t1, ll_t
 
 
 def step_wrapper(carry, xs):
-    """ Helper for lax.scan. """
-    
-    a_loc_t, a_scale_t, a_shape_t, Z, T, K, nu, ll_sum = carry
+    """Helper for lax.scan."""
+
+    a_t, Z, T, K, nu, ll_sum = carry
     y_t, fin_t = xs
 
-    model_t = (y_t, fin_t, a_loc_t, a_scale_t, a_shape_t, Z, T, K, nu)
-    a_loc_t1, a_scale_t1, a_shape_t1, ll_t = filter_step(model_t)
+    model_t = (y_t, fin_t, a_t, Z, T, K, nu)
+    a_t1, ll_t = filter_step(model_t)
 
-    return (a_loc_t1, a_scale_t1, a_shape_t1, Z, T, K, nu, ll_sum), (
-        ll_t,
-        a_loc_t1,
-        a_scale_t1,
-        a_shape_t1,
-    )
+    return (a_t1, Z, T, K, nu, ll_sum), (ll_t, jnp.squeeze(a_t1))
 
 
 def recursion(y, fin, a_init, Z, T, K, nu):
-    """ Runs the score driven recursion.
+    """Runs the score driven recursion.
 
     Args:
         Observations and initialised model components.
-        
+
     Returns:
         Log likelihood and states.
     """
-    
-    initial_carry = (a_init[:, 0], a_init[:, 1], a_init[:, 2], Z, T, K, nu, 0.0)
+
+    initial_carry = (a_init, Z, T, K, nu, 0.0)
 
     # Inputs that are iterated over the first dimension
     inputs = y, fin
 
     # Execute scan
-    (_, _, _, _, _, _, _, _), (loglik, a_loc, a_scale, a_shape) = lax.scan(
+    (_, _, _, _, _, _), (loglik, a) = lax.scan(
         step_wrapper, initial_carry, inputs
     )
-
-    return (loglik, a_loc, a_scale, a_shape)
+    
+    return (loglik, jnp.transpose(a, (1, 0, 2)))
 
 
 @partial(jit, static_argnums=(1, 2))
 def filter(pars, model, mle):
-    """ Initialise and run the score driven model.
+    """Initialise and run the score driven model.
 
     Args:
         pars: Parameters used for initialisation / parametrisation.
         model: model components.
         mle: Boolean indicating wether to return only the negative log likelihood or all model components.
-        
+
     Returns:
         Model after recursion execution or negative log likelihood.
     """
-    
+
     y, fin, _, Z, T, K = model
 
     # initialise the model given the parameters
@@ -276,8 +265,6 @@ def filter(pars, model, mle):
     else:
         result = (
             filter_result[1],
-            filter_result[2],
-            filter_result[3],
             Z,
             T,
             K,
@@ -290,15 +277,15 @@ def filter(pars, model, mle):
 
 @jit
 def log_likelihood(pars, model):
-    """ Helper for MLE, returns the loglikehood"""
-    
+    """Helper for MLE, returns the loglikehood"""
+
     loglik = filter(pars, model, mle=True)
     return loglik
 
 
 @jit
 def sd_filter(pars, model):
-    """ Helper, returns the model after intialisation and recursion"""
+    """Helper, returns the model after intialisation and recursion"""
 
     filter_results = filter(pars, model, mle=False)
     return filter_results
@@ -321,7 +308,7 @@ def ll_grad_scipy(pars, *args):
 
 
 def mle(model, iter, pertu, key, init_par=None, printing=False):
-    """ Maximum likelihood estimation
+    """Maximum likelihood estimation
 
     Args:
         model: model components.
@@ -329,11 +316,11 @@ def mle(model, iter, pertu, key, init_par=None, printing=False):
         pertu: (real scalar) noise to shock parameters during optimisation.
         init_par: (optional) initial vector of parameters.
         printing: String, show intermdiate results.
-        
+
     Returns:
         Mainly function and parameters at the maximum.
     """
-    
+
     # count the number of parameters to estimate
     n_pars = initialise(jnp.zeros(10000), model)[5]
 
@@ -357,7 +344,7 @@ def mle(model, iter, pertu, key, init_par=None, printing=False):
     for i in range(iter):
         key, subkey = random.split(key)
         pars_init = par_mle + random.normal(subkey, shape=(n_pars,)) * pertu
-        
+
         # Use scipy.optimize.minimize with the BFGS method
         result = minimize(
             fun=ll_scipy, x0=pars_init, jac=ll_grad_scipy, method="BFGS", args=model
@@ -378,7 +365,7 @@ import warnings
 
 
 def simulation(nb_iter, model, mle, var):
-    """ Simulate the model around the ML parameters.
+    """Simulate the model around the ML parameters.
     Runs the score driven recursion for each set drawn parameters.
 
     Args:
@@ -387,11 +374,11 @@ def simulation(nb_iter, model, mle, var):
         mle: Vector of estimated MLE parameters.
         init_par: (optional) initial vector of parameters.
         var: Estimated variance covariance matrix of the parameters.
-        
+
     Returns: Array of simulated states.
-        
+
     """
-    
+
     y, _, _, _, _, _ = model
 
     N, m = y.shape
@@ -405,7 +392,7 @@ def simulation(nb_iter, model, mle, var):
 
         # run the filter
         filter_i = sd_filter(pars, model)
-        
+
         # retreive states
         a_loc = filter_i[0]
         a_scale = filter_i[1]

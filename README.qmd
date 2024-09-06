@@ -58,15 +58,17 @@ slack_model = build_model(y)
 
 # estimation with maximum likelihood
 key = jax.random.PRNGKey(123)
-mle_result = mle(model=slack_model, iter=50, pertu=0.25, key=key)
+%time mle_result = mle(model=slack_model, iter=50, pertu=0.25, key=key)
 
 print("ML at", -mle_result.fun)
 ```
 
+```{python}
+y.shape[1]
+```
 #### Run the filter with the estimated parameters
 ```{python}
 from sdfm import sd_filter
-
 estimated_filter = sd_filter(mle_result.x, slack_model)
 ```
 
@@ -104,9 +106,9 @@ dates = dates.apply(convert_yearmon)
 df_plot = pd.DataFrame(
     {
         "date": dates,
-        "Location Common Factor": estimated_filter[0][:, y.shape[1]],
-        "Scale Common Factor": estimated_filter[1][:, y.shape[1]],
-        "Shape Common Factor": estimated_filter[2][:, y.shape[1]],
+        "Location Common Factor": estimated_filter[0][0, :, y.shape[1]],
+        "Scale Common Factor": estimated_filter[0][1, :, y.shape[1]],
+        "Shape Common Factor": estimated_filter[0][2, :, y.shape[1]],
     }
 )
 
