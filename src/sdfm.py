@@ -280,6 +280,7 @@ def log_likelihood(pars, model):
     loglik = filter(pars, model, mle=True)
     return loglik
 
+
 def sd_filter(pars, model):
     """Helper, returns the model after intialisation and recursion"""
 
@@ -296,10 +297,12 @@ ll_hessian = jit(hessian(log_likelihood))
 
 
 def ll_scipy(pars, *args):
+    """Wrapper for scipy optim function"""
     return log_likelihood(pars, args).item()
 
 
 def ll_grad_scipy(pars, *args):
+    """Wrapper for scipy optim function"""
     return np.array(ll_grad(pars, args))
 
 
