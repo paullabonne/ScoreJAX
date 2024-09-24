@@ -33,8 +33,6 @@ import pyarrow.parquet as pq
 
 # load the data
 df = pq.read_table("data/df_fredmd.parquet").to_pandas()
-
-df
 ```
 
 #### Estimation with maximum likelihood
@@ -57,7 +55,7 @@ slack_model = build_model(y)
 
 # estimation with maximum likelihood
 key = jax.random.PRNGKey(123)
-mle_result = mle(model=slack_model, iter=50, pertu=0.25, key=key)
+mle_result = mle(model=slack_model, iter=100, pertu=0.25, key=key)
 
 print("ML at", -mle_result.fun)
 ```

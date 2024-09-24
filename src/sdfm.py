@@ -68,12 +68,30 @@ def score(v, params):
     zeta = v / scale
     w = (1 + eta) / ((1 - sign(v) * shape) ** 2 + eta * zeta**2)
 
+    # with respect to mu (loc)
     score_loc = 1 / scale * w * zeta
-    score_scale = 1 / (2 * scale**2) * (w * zeta**2 - 1)
-    score_shape = -sign(v) / (1 - sign(v) * shape) * w * zeta**2
+    #
+    
+    # with respect to lambda = log(sigma) = log(scale)
+    # with repect to scale^2
+    score_scale_0 = 1 / (2 * scale**2) * (w * zeta**2 - 1)
 
+    # with respect to scale
+    score_scale_1 = score_scale_0 * 2 * scale
+
+    # with respect to lambda (scale = exp(lambda))
+    score_scale = score_scale_1 * scale
+    #
+    
+    # with respect to alpha
+    # with respect to shape
+    score_shape_0 = -sign(v) / (1 - sign(v) * shape) * w * zeta**2
+
+    # with respect to alpha (shape = tanh(alpha))
+    score_shape = score_shape_0 * (1 - shape**2)
+    #
+    
     score = jnp.array([score_loc, score_scale, score_shape])
-    score = jnp.nan_to_num(score, nan=0.0, posinf=0.0, neginf=0.0)
     score = score[:, :, None]
     return score
 
@@ -91,19 +109,19 @@ def build_model(y):
     N, m = y.shape
     p = m + 1
 
-    identity_block = jnp.repeat(jnp.eye(m)[None, :, :], 3, axis=0)
+    identity_block = jnp.repeat(jnp.eye(p)[None, :, :], 3, axis=0)
 
     # array of observation/link matrices
     Z = jnp.zeros((3, m, p))
-    Z = Z.at[:, :, 0:m].set(identity_block)
+    Z = Z.at[:, :, 0:m].set(identity_block[:, 0:m, 0:m])
 
     # array of transition matrices
     T = jnp.zeros((3, p, p))
-    T = T.at[:, 0:m, 0:m].set(identity_block)
+    T = T.at[:, :, :].set(identity_block)
 
     # array of gains
     K = jnp.zeros((3, p, p))
-    K = K.at[:, 0:m, 0:m].set(identity_block)
+    K = K.at[:, :, :].set(identity_block)
 
     # array of states
     a = jnp.zeros((3, p, N + 1))
@@ -137,13 +155,18 @@ def initialise(pars, model):
 
     for i in range(3):
         # initial state
-        a_init = a_init.at[i, 0:m, 0].set(pars[n_pars : n_pars + m] / 1e1)
+        a_init = a_init.at[i, 0:m, 0].set(pars[n_pars : n_pars + m])
         n_pars += m
 
         # observation matrices
         Z = Z.at[i, 0, m].set(1.0)  # factor is one for the first series
         Z = Z.at[i, 1:, m].set(pars[n_pars : (n_pars + m - 1)])
         n_pars += m - 1
+
+        K = K.at[i, 0 : m, 0 : m].set(
+           jnp.diag(jnp.exp(pars[n_pars : n_pars + m] * 2.0) * 1e-8)
+        )
+        n_pars += m
 
         # gain matrix
         K = K.at[i, 0 : m + 1, 0 : m + 1].set(
@@ -152,11 +175,11 @@ def initialise(pars, model):
         n_pars += m + 1
 
         # transition matrix
-        T = T.at[i, m, m].set(jnp.tanh(pars[n_pars]) * 0.95)
+        T = T.at[i, m, m].set(jnp.tanh(pars[n_pars] + 1.0) * 0.95)
         n_pars += 1
 
     # nu (tail parameter)
-    nu = jnp.exp(pars[n_pars : n_pars + m]) + 2.0
+    nu = jnp.exp(pars[n_pars : n_pars + m] * 2.0) + 2.0 #jnp.zeros(m) + 200.0#
     n_pars += m
 
     return a_init, Z, T, K, nu, n_pars
@@ -281,6 +304,7 @@ def log_likelihood(pars, model):
     return loglik
 
 
+@jit
 def sd_filter(pars, model):
     """Helper, returns the model after intialisation and recursion"""
 
@@ -305,7 +329,7 @@ def ll_grad_scipy(pars, *args):
     """Wrapper for scipy optim function"""
     return np.array(ll_grad(pars, args))
 
-
+from tqdm import tqdm 
 def mle(model, iter, pertu, key, init_par=None, printing=False):
     """Maximum likelihood estimation
 
@@ -340,7 +364,7 @@ def mle(model, iter, pertu, key, init_par=None, printing=False):
     par_mle = result.x
     result_min = result
 
-    for i in range(iter):
+    for i in tqdm(range(iter)):
         key, subkey = random.split(key)
         pars_init = par_mle + random.normal(subkey, shape=(n_pars,)) * pertu
 
@@ -359,11 +383,11 @@ def mle(model, iter, pertu, key, init_par=None, printing=False):
 
     return result_min
 
+# import warnings
+from numpy.linalg import inv
 
-import warnings
 
-
-def simulation(nb_iter, model, mle, var):
+def simulation(nb_iter, model, mle_pars):
     """Simulate the model around the ML parameters.
     Runs the score driven recursion for each set drawn parameters.
 
@@ -372,7 +396,6 @@ def simulation(nb_iter, model, mle, var):
         model: Estimated model.
         mle: Vector of estimated MLE parameters.
         init_par: (optional) initial vector of parameters.
-        var: Estimated variance covariance matrix of the parameters.
 
     Returns: Array of simulated states.
 
@@ -384,18 +407,22 @@ def simulation(nb_iter, model, mle, var):
 
     fac = np.zeros((N, nb_iter, 3))
 
+    # Variance covariance matrix of the parameters.
+    hess = ll_hessian(mle_pars, model)
+    var_covar = inv(hess + 1e-5 * np.eye(hess.shape[0]))
+
     for i in range(nb_iter):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=RuntimeWarning)
-            pars = np.random.multivariate_normal(mle, var, size=1)[0]
+        # with warnings.catch_warnings():
+        # warnings.simplefilter("ignore", category=RuntimeWarning)
+        pars = np.random.multivariate_normal(mle_pars, var_covar, size=1)[0]
 
         # run the filter
         filter_i = sd_filter(pars, model)
 
         # retreive states
-        a_loc = filter_i[0]
-        a_scale = filter_i[1]
-        a_shape = filter_i[2]
+        a_loc = filter_i[0][0, :, :]
+        a_scale = filter_i[0][1, :, :]
+        a_shape = filter_i[0][2, :, :]
 
         # store states
         fac[:, i, 0] = a_loc[:, m]
