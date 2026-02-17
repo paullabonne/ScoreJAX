@@ -2,7 +2,7 @@
 
 JAX (Bradbury et al. 2018) implementation of the score-driven model
 featuring location, scale and shape common factors introduced in Labonne
-P. (2024). “Asymmetric uncertainty: Nowcasting using skewness in
+P. (2025). “Asymmetric uncertainty: Nowcasting using skewness in
 real-time data”. *International Journal of Forecasting*
 
 JAX adds automatic differentiation and high-performance numerical
